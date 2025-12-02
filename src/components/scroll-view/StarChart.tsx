@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from 'react';
 import { motion, AnimatePresence, useScroll } from 'framer-motion';
+import { useCompletion } from '@ai-sdk/react';
 
 interface StarChartProps {
     allPalaces: any[];
@@ -90,28 +91,27 @@ export default function StarChart({ allPalaces, language }: StarChartProps) {
 }
 
 function PalaceCard({ palace, index, allPalaces, language }: { palace: any, index: number, allPalaces: any[], language: 'zh' | 'en' }) {
-    const [report, setReport] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
     const [expanded, setExpanded] = useState(false);
+
+    const { completion, complete, isLoading } = useCompletion({
+        api: '/api/analyze/palace',
+    });
 
     if (!palace) return null;
 
     const handleGenerateReport = async () => {
-        if (report) {
+        if (completion) {
             setExpanded(!expanded);
             return;
         }
 
-        setLoading(true);
         setExpanded(true);
         try {
-            const res = await fetch('/api/analyze/palace', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
+            await complete('', {
+                body: {
                     palaceName: palace.name,
-                    palaceIndex: index, // Pass the original index (0-11)
-                    allPalaces: allPalaces, // Pass full context
+                    palaceIndex: index,
+                    allPalaces: allPalaces,
                     stars: {
                         majorStars: palace.majorStars,
                         minorStars: palace.minorStars,
@@ -119,16 +119,11 @@ function PalaceCard({ palace, index, allPalaces, language }: { palace: any, inde
                     },
                     decadal: palace.decadal,
                     context: "Global context placeholder",
-                    language: language // Send language to API
-                })
+                    language: language
+                }
             });
-            const data = await res.json();
-            setReport(data.report);
         } catch (error) {
             console.error('Failed to generate report', error);
-            setReport('Failed to generate report. Please try again.');
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -231,19 +226,19 @@ function PalaceCard({ palace, index, allPalaces, language }: { palace: any, inde
                         onClick={handleGenerateReport}
                         className="w-full py-3 px-4 bg-white text-black hover:bg-gray-200 text-xs uppercase tracking-widest font-bold transition-colors rounded flex items-center justify-center gap-2"
                     >
-                        {loading ? (
+                        {isLoading ? (
                             <>
                                 <span className="animate-spin">✧</span> Analyzing...
                             </>
                         ) : (
                             <>
-                                <span>✧</span> {report ? (expanded ? 'Hide Insight' : 'Show Insight') : 'Reveal Destiny'}
+                                <span>✧</span> {completion ? (expanded ? 'Hide Insight' : 'Show Insight') : 'Reveal Destiny'}
                             </>
                         )}
                     </button>
 
                     <AnimatePresence>
-                        {expanded && report && (
+                        {expanded && (completion || isLoading) && (
                             <motion.div
                                 initial={{ height: 0, opacity: 0 }}
                                 animate={{ height: 'auto', opacity: 1 }}
@@ -251,7 +246,7 @@ function PalaceCard({ palace, index, allPalaces, language }: { palace: any, inde
                                 className="overflow-hidden"
                             >
                                 <div className="pt-6 pb-2 text-sm">
-                                    {renderMarkdown(report)}
+                                    {renderMarkdown(completion)}
                                 </div>
                             </motion.div>
                         )}

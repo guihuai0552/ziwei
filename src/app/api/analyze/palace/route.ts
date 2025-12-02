@@ -1,12 +1,11 @@
-import { generateText } from 'ai';
-import { google } from '@ai-sdk/google';
-import OpenAI from 'openai';
+import { streamText } from 'ai';
+import { createOpenAI } from '@ai-sdk/openai';
 import { getMutagens, getThreePartiesFourAreas } from '@/lib/ziwei-rules';
 import { RagClient } from '@/lib/rag-client';
 
-export const maxDuration = 300;
+export const maxDuration = 60; // Set to 60s for Vercel Hobby tier
 
-const openai = new OpenAI({
+const deepseek = createOpenAI({
     baseURL: 'https://api.deepseek.com',
     apiKey: process.env.DEEPSEEK_API_KEY,
 });
@@ -97,6 +96,8 @@ export async function POST(req: Request) {
     5.  **语气基调**: 保持神秘感与权威感。多用“此局”、“命主”、“迹象显示”等术语，但解释必须通俗易懂。
     6.  **格式规范**: 使用Markdown输出。
     
+    ${langInstruction}
+    
     ## Analysis Workflow (思维链)
     请按以下逻辑步骤进行深呼吸式思考，然后生成报告：
     1.  **定格局**: 观察本宫主星的庙旺利陷，判断该宫位的“地基”是否稳固。
@@ -104,46 +105,14 @@ export async function POST(req: Request) {
     3.  **寻变数**: 寻找四化（禄、权、科、忌）。哪里有化忌的纠缠？哪里有化禄的机缘？这是吉凶的关键。
     4.  **引经典**: 从 RAG 数据中提取相关断语，验证上述推理。
     5.  **下断语**: 综合所有信息，给出最终的性格/运势/建议判断。
-
     `;
 
-        let reportText = '';
+        const result = streamText({
+            model: deepseek('deepseek-chat'),
+            prompt: prompt,
+        });
 
-        // 1. Try Gemini
-        if (process.env.GEMINI_API_KEY) {
-            try {
-                console.log('Attempting generation with Gemini...');
-                const { text } = await generateText({
-                    model: google('gemini-3-pro-preview'),
-                    prompt: prompt,
-                });
-                reportText = text;
-            } catch (e) {
-                console.error('Gemini generation failed, falling back to DeepSeek:', e);
-            }
-        }
-
-        // 2. Fallback to DeepSeek
-        if (!reportText && process.env.DEEPSEEK_API_KEY) {
-            try {
-                console.log('Attempting generation with DeepSeek...');
-                const completion = await openai.chat.completions.create({
-                    messages: [{ role: 'user', content: prompt }],
-                    model: 'deepseek-chat',
-                });
-                reportText = completion.choices[0].message.content || '';
-            } catch (e) {
-                console.error('DeepSeek generation failed:', e);
-            }
-        }
-
-        if (!reportText) {
-            return Response.json({
-                report: `(Mock Report for ${palaceName}) \n\n The stars ${majorStars} indicate... (Add Valid API Key for real analysis)`
-            });
-        }
-
-        return Response.json({ report: reportText });
+        return result.toTextStreamResponse();
 
     } catch (error) {
         console.error('Palace analysis failed:', error);
