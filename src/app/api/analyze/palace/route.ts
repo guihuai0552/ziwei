@@ -4,7 +4,7 @@ import OpenAI from 'openai';
 import { getMutagens, getThreePartiesFourAreas } from '@/lib/ziwei-rules';
 import { RagClient } from '@/lib/rag-client';
 
-export const maxDuration = 30;
+export const maxDuration = 600;
 
 const openai = new OpenAI({
     baseURL: 'https://api.deepseek.com',
