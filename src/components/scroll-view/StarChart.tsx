@@ -86,19 +86,44 @@ const StarChart = ({ allPalaces, language, isUnlocked, onUnlockRequest, analyzin
         }
     };
 
-    const handleGenerateSinglePalaceImpl = async (index: number) => {
-        const realIndex = index % 12;
-        if (loadingPalaces[realIndex] || currentPalaces[realIndex].analysis) return;
+    const pollForAnalysis = async (taskId: string): Promise<string> => {
+        const maxAttempts = 60; // 2 minutes (2s interval)
+        let attempts = 0;
 
-        setLoadingPalaces(prev => ({ ...prev, [realIndex]: true }));
+        while (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            try {
+                const res = await fetch(`/api/analyze/palace?taskId=${taskId}`);
+                const data = await res.json();
+
+                if (data.status === 'completed') {
+                    return data.analysis;
+                } else if (data.status === 'failed') {
+                    throw new Error(data.error || 'Analysis failed');
+                }
+                // If pending, continue loop
+            } catch (e) {
+                console.warn('Polling error:', e);
+            }
+            attempts++;
+        }
+        throw new Error('Analysis timed out');
+    };
+
+    const handleGenerateSinglePalaceImpl = async (index: number) => {
+        const palace = currentPalaces[index];
+        if (loadingPalaces[index] || palace.analysis) return;
+
+        setLoadingPalaces(prev => ({ ...prev, [index]: true }));
+
         try {
-            const palace = currentPalaces[realIndex];
-            const res = await fetch('/api/analyze/palace', {
+            // 1. Start Task
+            const startRes = await fetch('/api/analyze/palace', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     palaceName: palace.name,
-                    palaceIndex: realIndex,
+                    palaceIndex: index,
                     allPalaces: currentPalaces,
                     stars: {
                         majorStars: palace.majorStars,
@@ -110,17 +135,25 @@ const StarChart = ({ allPalaces, language, isUnlocked, onUnlockRequest, analyzin
                     language: language
                 }),
             });
-            const result = await res.json();
 
+            const startData = await startRes.json();
+            if (!startData.taskId) throw new Error('Failed to start analysis task');
+
+            // 2. Poll for Result
+            const analysis = await pollForAnalysis(startData.taskId);
+
+            // 3. Update UI
             setCurrentPalaces(prev => {
                 const newPalaces = [...prev];
-                newPalaces[realIndex] = { ...newPalaces[realIndex], analysis: result.analysis };
+                newPalaces[index] = { ...newPalaces[index], analysis: analysis };
                 return newPalaces;
             });
-        } catch (e) {
-            console.error(e);
+
+        } catch (error) {
+            console.error(`Analysis failed for ${palace.name}:`, error);
+            alert('Analysis failed. Please try again.');
         } finally {
-            setLoadingPalaces(prev => ({ ...prev, [realIndex]: false }));
+            setLoadingPalaces(prev => ({ ...prev, [index]: false }));
         }
     };
 

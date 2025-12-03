@@ -1,22 +1,21 @@
 import OpenAI from 'openai';
 import { getMutagens, getThreePartiesFourAreas } from '@/lib/ziwei-rules';
 import { RagClient } from '@/lib/rag-client';
+import { taskStore } from '@/lib/task-store';
+import { v4 as uuidv4 } from 'uuid';
 
-export const maxDuration = 300; // 
+export const maxDuration = 300;
 
 const openai = new OpenAI({
     baseURL: 'https://api.deepseek.com',
     apiKey: process.env.DEEPSEEK_API_KEY,
-    timeout: 120 * 1000, // 120 seconds
+    timeout: 120 * 1000,
 });
 
-export async function POST(req: Request) {
+// Background Worker Function
+async function performAnalysis(taskId: string, data: any) {
     try {
-        const { palaceName, palaceIndex, allPalaces, stars, decadal, context, language } = await req.json();
-
-        if (!palaceName || !stars) {
-            return Response.json({ error: 'Missing palace data' }, { status: 400 });
-        }
+        const { palaceName, palaceIndex, allPalaces, stars, decadal, context, language } = data;
 
         // Advanced Analysis Preparation
         let advancedContext = '';
@@ -25,7 +24,6 @@ export async function POST(req: Request) {
         if (allPalaces && typeof palaceIndex === 'number') {
             const { self, opposite, triad1, triad2 } = getThreePartiesFourAreas(palaceIndex, allPalaces);
 
-            // Helper to format stars
             const fmt = (p: any) => {
                 if (!p) return 'Unknown';
                 const majors = p.majorStars.map((s: any) => `${s.name}(${s.brightness})`).join('、');
@@ -40,7 +38,6 @@ export async function POST(req: Request) {
     - Triad 2 (三方 - ${triad2.name}): ${fmt(triad2)}
         `;
 
-            // Mutagen Logic
             const stem = self.heavenlyStem;
             const mutagens = getMutagens(stem);
             mutagenInfo = `
@@ -50,19 +47,17 @@ export async function POST(req: Request) {
         `;
         }
 
-        // Format stars for prompt (Basic)
         const majorStars = stars.majorStars.map((s: any) => `${s.name}(${s.brightness}${s.mutagen ? ',' + s.mutagen : ''})`).join('、');
         const minorStars = stars.minorStars.map((s: any) => `${s.name}(${s.brightness || '-'})`).join('、');
         const adjectiveStars = stars.adjectiveStars.map((s: any) => s.name).join('、');
 
-        // RAG Context Retrieval
         let ragContext = '';
         try {
             const query = `紫微斗数 ${palaceName} ${majorStars} ${minorStars}`;
-            console.log(`Fetching RAG context for: ${query}`);
+            console.log(`[Task ${taskId}] Fetching RAG context for: ${query}`);
             ragContext = await RagClient.searchContext(query);
         } catch (e) {
-            console.error('RAG retrieval failed', e);
+            console.error(`[Task ${taskId}] RAG retrieval failed`, e);
         }
 
         const langInstruction = language === 'en'
@@ -114,10 +109,60 @@ export async function POST(req: Request) {
 
         const analysis = completion.choices[0].message.content;
 
-        return Response.json({ analysis });
+        // Update task store with success
+        taskStore.update(taskId, { status: 'completed', result: analysis });
+        console.log(`[Task ${taskId}] Completed successfully.`);
+
+    } catch (error: any) {
+        console.error(`[Task ${taskId}] Failed:`, error);
+        taskStore.update(taskId, { status: 'failed', error: error.message || 'Analysis failed' });
+    }
+}
+
+// POST: Start Analysis Task
+export async function POST(req: Request) {
+    try {
+        const body = await req.json();
+        const { palaceName, stars } = body;
+
+        if (!palaceName || !stars) {
+            return Response.json({ error: 'Missing palace data' }, { status: 400 });
+        }
+
+        const taskId = uuidv4();
+        taskStore.create(taskId);
+
+        // Start background processing WITHOUT awaiting
+        performAnalysis(taskId, body);
+
+        return Response.json({ taskId, status: 'pending', message: 'Analysis started' });
 
     } catch (error) {
-        console.error('Palace analysis failed:', error);
-        return Response.json({ error: 'Analysis failed' }, { status: 500 });
+        console.error('Task creation failed:', error);
+        return Response.json({ error: 'Failed to start analysis' }, { status: 500 });
+    }
+}
+
+// GET: Poll Task Status
+export async function GET(req: Request) {
+    const { searchParams } = new URL(req.url);
+    const taskId = searchParams.get('taskId');
+
+    if (!taskId) {
+        return Response.json({ error: 'taskId is required' }, { status: 400 });
+    }
+
+    const task = taskStore.get(taskId);
+
+    if (!task) {
+        return Response.json({ error: 'Task not found' }, { status: 404 });
+    }
+
+    if (task.status === 'completed') {
+        return Response.json({ status: 'completed', analysis: task.result });
+    } else if (task.status === 'failed') {
+        return Response.json({ status: 'failed', error: task.error });
+    } else {
+        return Response.json({ status: 'pending' });
     }
 }
