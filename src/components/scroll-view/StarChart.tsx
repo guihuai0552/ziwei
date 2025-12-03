@@ -43,9 +43,12 @@ const parseMarkdownToHtml = (text: string) => {
 interface StarChartProps {
     allPalaces: any[];
     language: 'zh' | 'en';
+    isUnlocked: boolean;
+    onUnlockRequest: () => void;
+    analyzingNames: string[];
 }
 
-const StarChart = ({ allPalaces, language }: StarChartProps) => {
+const StarChart = ({ allPalaces, language, isUnlocked, onUnlockRequest, analyzingNames }: StarChartProps) => {
     const [loadingPalaces, setLoadingPalaces] = useState<Record<number, boolean>>({});
     const [currentPalaces, setCurrentPalaces] = useState(allPalaces);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -118,6 +121,25 @@ const StarChart = ({ allPalaces, language }: StarChartProps) => {
             console.error(e);
         } finally {
             setLoadingPalaces(prev => ({ ...prev, [realIndex]: false }));
+        }
+    };
+
+    const [pendingDownload, setPendingDownload] = useState(false);
+
+    // Auto-trigger download if unlocked and pending
+    useEffect(() => {
+        if (isUnlocked && pendingDownload) {
+            handleDownloadPDF();
+            setPendingDownload(false);
+        }
+    }, [isUnlocked, pendingDownload]);
+
+    const handleDownloadClick = () => {
+        if (!isUnlocked) {
+            setPendingDownload(true);
+            onUnlockRequest();
+        } else {
+            handleDownloadPDF();
         }
     };
 
@@ -215,11 +237,11 @@ const StarChart = ({ allPalaces, language }: StarChartProps) => {
                 <p className="text-gray-500 text-xs tracking-widest uppercase mb-4">Swipe to Explore Palaces</p>
 
                 <button
-                    onClick={handleDownloadPDF}
+                    onClick={handleDownloadClick}
                     disabled={isGeneratingPdf}
                     className="px-6 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-full text-xs uppercase tracking-widest text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                    {isGeneratingPdf ? 'Generating Report...' : 'Download Full Report'}
+                    {isGeneratingPdf ? 'Generating Full Report... Please Wait' : 'Download Full Report'}
                 </button>
             </div>
 
@@ -243,6 +265,9 @@ const StarChart = ({ allPalaces, language }: StarChartProps) => {
                         language={language}
                         onGenerate={() => handleGenerateSinglePalaceImpl(idx)}
                         isLoading={loadingPalaces[idx % 12]}
+                        isUnlocked={isUnlocked}
+                        onUnlockRequest={onUnlockRequest}
+                        isAnalyzing={analyzingNames?.includes(palace.name)}
                     />
                 ))}
             </div>
@@ -260,14 +285,33 @@ const StarChart = ({ allPalaces, language }: StarChartProps) => {
     );
 }
 
-function PalaceCard({ palace, index, allPalaces, language, onGenerate, isLoading }: { palace: any, index: number, allPalaces: any[], language: 'zh' | 'en', onGenerate: () => void, isLoading: boolean }) {
+function PalaceCard({ palace, index, allPalaces, language, onGenerate, isLoading, isUnlocked, onUnlockRequest, isAnalyzing }: {
+    palace: any,
+    index: number,
+    allPalaces: any[],
+    language: 'zh' | 'en',
+    onGenerate: () => void,
+    isLoading: boolean,
+    isUnlocked: boolean,
+    onUnlockRequest: () => void,
+    isAnalyzing: boolean
+}) {
     const [expanded, setExpanded] = useState(false);
 
     const handleGenerateReport = () => {
+        if (!isUnlocked && !palace.isLifePalace && palace.name !== '命宫') {
+            onUnlockRequest();
+            return;
+        }
+
         if (palace.analysis) {
             setExpanded(!expanded);
         } else {
-            onGenerate();
+            // If analyzing, do nothing or show toast?
+            // If not analyzing and no analysis, trigger generate (retry)
+            if (!isAnalyzing) {
+                onGenerate();
+            }
         }
     };
 
@@ -419,10 +463,12 @@ function PalaceCard({ palace, index, allPalaces, language, onGenerate, isLoading
                 <div className="mt-auto pt-4 border-t border-gray-800">
                     <button
                         onClick={handleGenerateReport}
-                        disabled={isLoading}
+                        disabled={isLoading || (isAnalyzing && isUnlocked)}
                         className="w-full py-3 px-4 bg-white text-black hover:bg-gray-200 text-xs uppercase tracking-widest font-bold transition-colors rounded flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        {isLoading ? (
+                        {(!isUnlocked && !palace.isLifePalace && palace.name !== '命宫') ? (
+                            <><span>🔒</span> Unlock to Reveal</>
+                        ) : (isLoading || isAnalyzing) ? (
                             <span>Divining...</span>
                         ) : palace.analysis ? (
                             <><span>✧</span> {expanded ? 'Hide Insight' : 'Show Insight'}</>

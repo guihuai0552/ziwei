@@ -2,7 +2,7 @@ import OpenAI from 'openai';
 import { getMutagens, getThreePartiesFourAreas } from '@/lib/ziwei-rules';
 import { RagClient } from '@/lib/rag-client';
 
-export const maxDuration = 60; // Set to 60s for Vercel Hobby tier
+export const maxDuration = 300; // Set to 60s for Vercel Hobby tier
 
 const openai = new OpenAI({
     baseURL: 'https://api.deepseek.com',
@@ -69,7 +69,7 @@ export async function POST(req: Request) {
             : "IMPORTANT: Output the report in Chinese (Simplified).";
 
         const prompt = `
-    你是紫薇斗数大师. 对**${palaceName}**进行深度分析.
+    你是紫薇斗数大师. 对**${palaceName}**进行深度分析，能用朴实的语言为求问人提供翔实易懂的分析.
     
     ## 1. 本宫
     - 主星: ${majorStars || 'None'}
@@ -91,18 +91,18 @@ export async function POST(req: Request) {
     1.  **深度优先**: 严禁简略。必须对每一颗主星、辅星及其组合进行深度剖析。不限字数，以分析透彻为准。
     2.  **星曜互涉**: 必须分析本宫星曜与对宫星曜的“冲、照、拱、夹”关系，不能孤立论命。
     3.  **四化驱动**: 必须详细解释“宫干四化”及“生年四化”如何引动吉凶，这是动态分析的关键。
-    4.  **古今结合**: 引用 RAG 提供的古籍时，必须结合现代语境进行翻译和解释，拒绝生搬硬套。
+    4.  **古今结合**: 将RAG提供的古籍在分析中使用，引用古籍时，必须完整引用，并结合语境进行解释，拒绝生搬硬套。
     5.  **语气基调**: 保持神秘感与权威感。多用“此局”、“命主”、“迹象显示”等术语，但解释必须通俗易懂。
     6.  **格式规范**: 使用Markdown输出。
     
     ${langInstruction}
     
     ## Analysis Workflow (思维链)
-    请按以下逻辑步骤进行深呼吸式思考，然后生成报告：
-    1.  **定格局**: 观察本宫主星的庙旺利陷，判断该宫位的“地基”是否稳固。
-    2.  **看交互**: 结合三方四正。对宫是外界的照映，三合宫是资源的来源。分析它们是“辅佐”本宫还是“冲击”本宫。
-    3.  **寻变数**: 寻找四化（禄、权、科、忌）。哪里有化忌的纠缠？哪里有化禄的机缘？这是吉凶的关键。
-    4.  **引经典**: 从 RAG 数据中提取相关断语，验证上述推理。
+    请按以下逻辑步骤进行深呼吸式思考，保持语言通俗易懂，生成报告：
+    1.  **引经典**: 从 RAG 数据中提取相关断语，完整地引用，并融入分析推理中。
+    2.  **定格局**: 观察本宫主星的庙旺利陷，判断该宫位的“地基”是否稳固。
+    3.  **看交互**: 结合三方四正。对宫是外界的照映，三合宫是资源的来源。分析它们是“辅佐”本宫还是“冲击”本宫。
+    4.  **寻变数**: 寻找四化（禄、权、科、忌）。哪里有化忌的纠缠？哪里有化禄的机缘？这是吉凶的关键。
     5.  **下断语**: 综合所有信息，给出最终的性格/运势/建议判断。
     `;
 
