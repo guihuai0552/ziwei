@@ -4,6 +4,7 @@ import ziweiIndexData from './ziwei_index.json';
 const openai = new OpenAI({
     apiKey: process.env.DEEPSEEK_API_KEY,
     baseURL: 'https://api.deepseek.com',
+    timeout: 120 * 1000, // 120 seconds
 });
 
 interface PageIndexNode {

@@ -2,11 +2,12 @@ import OpenAI from 'openai';
 import { getMutagens, getThreePartiesFourAreas } from '@/lib/ziwei-rules';
 import { RagClient } from '@/lib/rag-client';
 
-export const maxDuration = 300; // Set to 60s for Vercel Hobby tier
+export const maxDuration = 300; // 
 
 const openai = new OpenAI({
     baseURL: 'https://api.deepseek.com',
     apiKey: process.env.DEEPSEEK_API_KEY,
+    timeout: 120 * 1000, // 120 seconds
 });
 
 export async function POST(req: Request) {
