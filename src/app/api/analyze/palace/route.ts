@@ -1,11 +1,10 @@
-import { streamText } from 'ai';
-import { createOpenAI } from '@ai-sdk/openai';
+import OpenAI from 'openai';
 import { getMutagens, getThreePartiesFourAreas } from '@/lib/ziwei-rules';
 import { RagClient } from '@/lib/rag-client';
 
 export const maxDuration = 60; // Set to 60s for Vercel Hobby tier
 
-const deepseek = createOpenAI({
+const openai = new OpenAI({
     baseURL: 'https://api.deepseek.com',
     apiKey: process.env.DEEPSEEK_API_KEY,
 });
@@ -107,12 +106,14 @@ export async function POST(req: Request) {
     5.  **下断语**: 综合所有信息，给出最终的性格/运势/建议判断。
     `;
 
-        const result = streamText({
-            model: deepseek('deepseek-chat'),
-            prompt: prompt,
+        const completion = await openai.chat.completions.create({
+            model: 'deepseek-chat',
+            messages: [{ role: 'user', content: prompt }],
         });
 
-        return result.toTextStreamResponse();
+        const analysis = completion.choices[0].message.content;
+
+        return Response.json({ analysis });
 
     } catch (error) {
         console.error('Palace analysis failed:', error);

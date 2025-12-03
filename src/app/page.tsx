@@ -22,7 +22,42 @@ export default function Home() {
       const data = await response.json();
 
       if (data.astrolabe) {
-        setAstrolabeData(data.astrolabe);
+        // Pre-load all 12 palaces analysis
+        // Pre-load only Life Palace analysis
+        const lifePalaceIndex = data.astrolabe.palaces.findIndex((p: any) => p.isLifePalace || p.name === '命宫');
+
+        let enrichedPalaces = [...data.astrolabe.palaces];
+
+        if (lifePalaceIndex !== -1) {
+          try {
+            const palace = enrichedPalaces[lifePalaceIndex];
+            const res = await fetch('/api/analyze/palace', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                palaceName: palace.name,
+                palaceIndex: lifePalaceIndex,
+                allPalaces: data.astrolabe.palaces,
+                stars: {
+                  majorStars: palace.majorStars,
+                  minorStars: palace.minorStars,
+                  adjectiveStars: palace.adjectiveStars
+                },
+                decadal: palace.decadal,
+                context: "Global context placeholder",
+                language: language
+              }),
+            });
+            const result = await res.json();
+            enrichedPalaces[lifePalaceIndex] = { ...palace, analysis: result.analysis };
+          } catch (err) {
+            console.error(`Failed to analyze Life Palace`, err);
+          }
+        }
+
+
+
+        setAstrolabeData({ ...data.astrolabe, palaces: enrichedPalaces });
         setStep('report');
       } else {
         // Handle error
