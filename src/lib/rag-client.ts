@@ -69,7 +69,7 @@ ${toc}
 
 User Query: "${query}"
 
-Return ONLY a JSON array of Node IDs, e.g., ["0001", "0005"]. Select at most 3-5 most relevant nodes.
+Return ONLY a JSON array of Node IDs, e.g., ["0001", "0005"]. Select at most 2 most relevant nodes.
 `;
 
             const response = await openai.chat.completions.create({
@@ -92,11 +92,16 @@ Return ONLY a JSON array of Node IDs, e.g., ["0001", "0005"]. Select at most 3-5
 
             console.log('RAG Selected Nodes:', nodeIds);
 
-            // 3. Retrieve text
+            // 3. Retrieve text (Limit to 2 nodes, max 1500 chars each)
             const texts = nodeIds
+                .slice(0, 2)
                 .map(id => this.findNode(ziweiIndex.structure, id))
                 .filter(node => node && node.text)
-                .map(node => `### ${node!.title}\n${node!.text}`);
+                .map(node => {
+                    const text = node!.text || '';
+                    const truncated = text.length > 1500 ? text.substring(0, 1500) + '... (truncated)' : text;
+                    return `### ${node!.title}\n${truncated}`;
+                });
 
             return texts.join('\n\n');
 
