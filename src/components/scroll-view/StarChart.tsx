@@ -86,30 +86,6 @@ const StarChart = ({ allPalaces, language, isUnlocked, onUnlockRequest, analyzin
         }
     };
 
-    const pollForAnalysis = async (taskId: string): Promise<string> => {
-        const maxAttempts = 60; // 2 minutes (2s interval)
-        let attempts = 0;
-
-        while (attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            try {
-                const res = await fetch(`/api/analyze/palace?taskId=${taskId}`);
-                const data = await res.json();
-
-                if (data.status === 'completed') {
-                    return data.analysis;
-                } else if (data.status === 'failed') {
-                    throw new Error(data.error || 'Analysis failed');
-                }
-                // If pending, continue loop
-            } catch (e) {
-                console.warn('Polling error:', e);
-            }
-            attempts++;
-        }
-        throw new Error('Analysis timed out');
-    };
-
     const handleGenerateSinglePalaceImpl = async (index: number) => {
         const palace = currentPalaces[index];
         if (loadingPalaces[index] || palace.analysis) return;
@@ -117,8 +93,7 @@ const StarChart = ({ allPalaces, language, isUnlocked, onUnlockRequest, analyzin
         setLoadingPalaces(prev => ({ ...prev, [index]: true }));
 
         try {
-            // 1. Start Task
-            const startRes = await fetch('/api/analyze/palace', {
+            const res = await fetch('/api/analyze/palace', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -135,23 +110,15 @@ const StarChart = ({ allPalaces, language, isUnlocked, onUnlockRequest, analyzin
                     language: language
                 }),
             });
+            const result = await res.json();
 
-            const startData = await startRes.json();
-            if (!startData.taskId) throw new Error('Failed to start analysis task');
-
-            // 2. Poll for Result
-            const analysis = await pollForAnalysis(startData.taskId);
-
-            // 3. Update UI
             setCurrentPalaces(prev => {
                 const newPalaces = [...prev];
-                newPalaces[index] = { ...newPalaces[index], analysis: analysis };
+                newPalaces[index] = { ...newPalaces[index], analysis: result.analysis };
                 return newPalaces;
             });
-
-        } catch (error) {
-            console.error(`Analysis failed for ${palace.name}:`, error);
-            alert('Analysis failed. Please try again.');
+        } catch (e) {
+            console.error(e);
         } finally {
             setLoadingPalaces(prev => ({ ...prev, [index]: false }));
         }

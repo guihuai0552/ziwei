@@ -1,21 +1,22 @@
 import OpenAI from 'openai';
 import { getMutagens, getThreePartiesFourAreas } from '@/lib/ziwei-rules';
 import { RagClient } from '@/lib/rag-client';
-import { taskStore } from '@/lib/task-store';
-import { v4 as uuidv4 } from 'uuid';
 
 export const maxDuration = 300;
 
 const openai = new OpenAI({
     baseURL: 'https://api.deepseek.com',
     apiKey: process.env.DEEPSEEK_API_KEY,
-    timeout: 120 * 1000,
+    timeout: 300 * 1000, // Keep 300s timeout for VPS
 });
 
-// Background Worker Function
-async function performAnalysis(taskId: string, data: any) {
+export async function POST(req: Request) {
     try {
-        const { palaceName, palaceIndex, allPalaces, stars, decadal, context, language } = data;
+        const { palaceName, palaceIndex, allPalaces, stars, decadal, context, language } = await req.json();
+
+        if (!palaceName || !stars) {
+            return Response.json({ error: 'Missing palace data' }, { status: 400 });
+        }
 
         // Advanced Analysis Preparation
         let advancedContext = '';
@@ -54,10 +55,10 @@ async function performAnalysis(taskId: string, data: any) {
         let ragContext = '';
         try {
             const query = `紫微斗数 ${palaceName} ${majorStars} ${minorStars}`;
-            console.log(`[Task ${taskId}] Fetching RAG context for: ${query}`);
+            console.log(`Fetching RAG context for: ${query}`);
             ragContext = await RagClient.searchContext(query);
         } catch (e) {
-            console.error(`[Task ${taskId}] RAG retrieval failed`, e);
+            console.error('RAG retrieval failed', e);
         }
 
         const langInstruction = language === 'en'
@@ -109,60 +110,10 @@ async function performAnalysis(taskId: string, data: any) {
 
         const analysis = completion.choices[0].message.content;
 
-        // Update task store with success
-        taskStore.update(taskId, { status: 'completed', result: analysis });
-        console.log(`[Task ${taskId}] Completed successfully.`);
+        return Response.json({ analysis });
 
     } catch (error: any) {
-        console.error(`[Task ${taskId}] Failed:`, error);
-        taskStore.update(taskId, { status: 'failed', error: error.message || 'Analysis failed' });
-    }
-}
-
-// POST: Start Analysis Task
-export async function POST(req: Request) {
-    try {
-        const body = await req.json();
-        const { palaceName, stars } = body;
-
-        if (!palaceName || !stars) {
-            return Response.json({ error: 'Missing palace data' }, { status: 400 });
-        }
-
-        const taskId = uuidv4();
-        taskStore.create(taskId);
-
-        // Start background processing WITHOUT awaiting
-        performAnalysis(taskId, body);
-
-        return Response.json({ taskId, status: 'pending', message: 'Analysis started' });
-
-    } catch (error) {
-        console.error('Task creation failed:', error);
-        return Response.json({ error: 'Failed to start analysis' }, { status: 500 });
-    }
-}
-
-// GET: Poll Task Status
-export async function GET(req: Request) {
-    const { searchParams } = new URL(req.url);
-    const taskId = searchParams.get('taskId');
-
-    if (!taskId) {
-        return Response.json({ error: 'taskId is required' }, { status: 400 });
-    }
-
-    const task = taskStore.get(taskId);
-
-    if (!task) {
-        return Response.json({ error: 'Task not found' }, { status: 404 });
-    }
-
-    if (task.status === 'completed') {
-        return Response.json({ status: 'completed', analysis: task.result });
-    } else if (task.status === 'failed') {
-        return Response.json({ status: 'failed', error: task.error });
-    } else {
-        return Response.json({ status: 'pending' });
+        console.error('Palace analysis failed:', error);
+        return Response.json({ error: 'Analysis failed' }, { status: 500 });
     }
 }

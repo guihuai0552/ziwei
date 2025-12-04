@@ -81,30 +81,13 @@ export default function Home() {
 
         setAnalyzingNames(namesToAnalyze);
 
-        // Helper for polling
-        const pollForAnalysis = async (taskId: string): Promise<string> => {
-          const maxAttempts = 60;
-          let attempts = 0;
-          while (attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 2000));
-            try {
-              const res = await fetch(`/api/analyze/palace?taskId=${taskId}`);
-              const data = await res.json();
-              if (data.status === 'completed') return data.analysis;
-              if (data.status === 'failed') throw new Error(data.error);
-            } catch (e) { /* ignore polling errors */ }
-            attempts++;
-          }
-          throw new Error('Timeout');
-        };
-
         // Trigger background analysis for ALL palaces (Simultaneous Analysis)
         data.astrolabe.palaces.forEach(async (palace: any, originalIndex: number) => {
+          // Skip if already analyzed (Life Palace might be done or started)
           if (originalIndex === originalLifePalaceIndex) return;
 
           try {
-            // 1. Start Task
-            const startRes = await fetch('/api/analyze/palace', {
+            const res = await fetch('/api/analyze/palace', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -121,26 +104,31 @@ export default function Home() {
                 language: language
               }),
             });
-            const startData = await startRes.json();
+            const result = await res.json();
 
-            if (startData.taskId) {
-              // 2. Poll
-              const analysis = await pollForAnalysis(startData.taskId);
+            // Update state with the new analysis
+            setAstrolabeData((prev: any) => {
+              if (!prev) return prev;
 
-              // 3. Update State
-              setAstrolabeData((prev: any) => {
-                if (!prev) return prev;
-                const newOriginalPalaces = [...prev.originalPalaces];
-                newOriginalPalaces[originalIndex] = { ...newOriginalPalaces[originalIndex], analysis: analysis };
+              // We need to update the palace in the 'palaces' array (which is SORTED)
+              // and 'originalPalaces' (which is ORIGINAL order)
 
-                const newSortedPalaces = [...prev.palaces];
-                const sortedIndex = newSortedPalaces.findIndex(p => p.name === palace.name);
-                if (sortedIndex !== -1) {
-                  newSortedPalaces[sortedIndex] = { ...newSortedPalaces[sortedIndex], analysis: analysis };
-                }
-                return { ...prev, palaces: newSortedPalaces, originalPalaces: newOriginalPalaces };
-              });
-            }
+              const newOriginalPalaces = [...prev.originalPalaces];
+              newOriginalPalaces[originalIndex] = { ...newOriginalPalaces[originalIndex], analysis: result.analysis };
+
+              // Find where this palace is in the sorted array
+              const newSortedPalaces = [...prev.palaces];
+              const sortedIndex = newSortedPalaces.findIndex(p => p.name === palace.name);
+              if (sortedIndex !== -1) {
+                newSortedPalaces[sortedIndex] = { ...newSortedPalaces[sortedIndex], analysis: result.analysis };
+              }
+
+              return {
+                ...prev,
+                palaces: newSortedPalaces,
+                originalPalaces: newOriginalPalaces
+              };
+            });
 
           } catch (err) {
             console.error(`Background analysis failed for ${palace.name}`, err);
