@@ -13,7 +13,37 @@ SSH into your server:
 ssh root@your_server_ip
 ```
 
-Install Docker & Docker Compose (Ubuntu):
+Install Docker & Docker Compose:
+
+### Option A: CentOS / Alibaba Cloud Linux (Recommended for your server)
+Since you are on an Alibaba Cloud server in China, the official Docker hub might be blocked or slow. Use the **Alibaba Cloud Mirror**:
+
+```bash
+# Install utils
+sudo yum install -y yum-utils
+
+# Add Docker repo (Alibaba Cloud Mirror)
+sudo yum-config-manager --add-repo http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+
+# Install Docker
+sudo yum install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+
+# Start Docker
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# (Optional) Configure Image Accelerator if pulling images is slow
+sudo mkdir -p /etc/docker
+sudo tee /etc/docker/daemon.json <<-'EOF'
+{
+  "registry-mirrors": ["https://docker.m.daocloud.io", "https://dockerproxy.com"]
+}
+EOF
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+```
+
+### Option B: Ubuntu / Debian
 ```bash
 # Add Docker's official GPG key:
 sudo apt-get update
