@@ -2,8 +2,9 @@ import PocketBase from 'pocketbase';
 import { NextRequest, NextResponse } from 'next/server';
 
 // Initialize PocketBase client
-// Note: In production, you should use an environment variable for the URL
-const pb = new PocketBase(process.env.NEXT_PUBLIC_POCKETBASE_URL || 'http://127.0.0.1:8090');
+// Prioritize internal Docker URL if available, otherwise use public/local URL
+const pbUrl = process.env.POCKETBASE_INTERNAL_URL || process.env.NEXT_PUBLIC_POCKETBASE_URL || 'http://127.0.0.1:8090';
+const pb = new PocketBase(pbUrl);
 
 export async function POST(req: NextRequest) {
     try {
@@ -24,12 +25,20 @@ export async function POST(req: NextRequest) {
             await pb.admins.authWithPassword(email, password);
         }
 
-        // 2. Find the code
-        // We use getFirstListItem to find by the 'code' field
-        const record = await pb.collection('redemption_codes').getFirstListItem(`code="${code}"`);
+        // 2. Find the code (using Record ID)
+        // User inputs the Record ID directly
+        let record;
+        try {
+            record = await pb.collection('redemption_codes').getOne(code);
+        } catch (e: any) {
+            if (e.status === 404) {
+                return NextResponse.json({ error: 'Invalid ID' }, { status: 404 });
+            }
+            throw e;
+        }
 
         if (!record) {
-            return NextResponse.json({ error: 'Invalid code' }, { status: 404 });
+            return NextResponse.json({ error: 'Invalid ID' }, { status: 404 });
         }
 
         if (record.is_used) {

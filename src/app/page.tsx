@@ -320,10 +320,10 @@ export default function Home() {
                   <div className="space-y-4">
                     <input
                       type="text"
-                      placeholder="Enter Code (e.g. A1B2C3D4)"
+                      placeholder="Enter 15-character Redemption ID"
+                      className="w-full p-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/30 focus:outline-none focus:border-purple-500 transition-colors"
                       value={redeemCode}
-                      onChange={(e) => setRedeemCode(e.target.value.toUpperCase())}
-                      className="w-full bg-black/50 border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-600 focus:outline-none focus:border-white/50 text-center tracking-widest uppercase"
+                      onChange={(e) => setRedeemCode(e.target.value)}
                     />
 
                     {redeemError && (

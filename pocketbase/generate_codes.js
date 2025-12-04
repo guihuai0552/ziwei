@@ -1,32 +1,38 @@
 const fs = require('fs');
-const crypto = require('crypto');
 
-function generateCode() {
-    // Generate a random 8-character alphanumeric code
-    return crypto.randomBytes(4).toString('hex').toUpperCase();
+// Generate 1000 records to get their IDs
+const records = [];
+for (let i = 0; i < 1000; i++) {
+    records.push({
+        is_used: false,
+        // We don't need a 'code' field anymore, we use the system ID
+        // You can add other metadata here if needed
+        note: `Batch 1 - ${i}`
+    });
 }
 
-const codes = new Set();
-while (codes.size < 1000) {
-    codes.add(generateCode());
+// Note: This JSON is for IMPORTING into PocketBase.
+// PocketBase import expects an array of objects.
+// However, we can't "predict" the IDs if we just import.
+// If we want to KNOW the IDs, we have to create them via API or set custom IDs.
+// PocketBase allows setting custom IDs (15 chars).
+
+// Let's generate custom 15-char IDs so we know them beforehand!
+function generateId() {
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < 15; i++) {
+        result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
 }
 
-const codeList = Array.from(codes).map(code => ({
-    code: code,
-    is_used: false,
-    used_by: null,
-    used_at: null
+const recordsWithIds = records.map(r => ({
+    id: generateId(),
+    ...r
 }));
 
-const output = {
-    name: "redemption_codes",
-    schema: [
-        { name: "code", type: "text", required: true, unique: true },
-        { name: "is_used", type: "bool" },
-        { name: "used_by", type: "text" }, // User ID or similar
-        { name: "used_at", type: "date" }
-    ],
-    documents: codeList
+documents: codeList
 };
 
 // Output as a JSON file compatible with PocketBase import (or just raw data)
