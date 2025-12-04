@@ -79,10 +79,30 @@ git clone https://github.com/guihuai0552/ziwei.git
 cd ziwei
 ```
 
-**Option B: China Mirror (If standard clone times out)**
+**Option B: China Mirror (Try this first)**
 ```bash
 cd /var/www
-git clone https://mirror.ghproxy.com/https://github.com/guihuai0552/ziwei.git
+git clone https://gitclone.com/github.com/guihuai0552/ziwei.git
+cd ziwei
+```
+
+**Option C: Upload Manually (If all clones fail)**
+If you cannot clone on the server, upload your local code to the server.
+Run this **on your local computer** (not the server):
+
+```bash
+# 1. Zip your local project (exclude node_modules and .git to save time)
+# Run in your local project root:
+zip -r ziwei.zip . -x "node_modules/*" ".git/*" ".next/*"
+
+# 2. Upload to server
+scp ziwei.zip root@<YOUR_SERVER_IP>:/var/www/
+
+# 3. On Server: Unzip
+ssh root@<YOUR_SERVER_IP>
+cd /var/www
+apt install unzip  # or 'yum install unzip'
+unzip ziwei.zip -d ziwei
 cd ziwei
 ```
 
