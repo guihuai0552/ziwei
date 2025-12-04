@@ -71,9 +71,18 @@ sudo yum install -y git
 ```
 
 Clone your repository:
+
+**Option A: Standard Clone**
 ```bash
 cd /var/www
 git clone https://github.com/guihuai0552/ziwei.git
+cd ziwei
+```
+
+**Option B: China Mirror (If standard clone times out)**
+```bash
+cd /var/www
+git clone https://mirror.ghproxy.com/https://github.com/guihuai0552/ziwei.git
 cd ziwei
 ```
 
