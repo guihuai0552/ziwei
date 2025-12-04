@@ -65,6 +65,11 @@ sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plug
 
 ## 2. Deploy Application
 
+Install Git (if not installed):
+```bash
+sudo yum install -y git
+```
+
 Clone your repository:
 ```bash
 cd /var/www
